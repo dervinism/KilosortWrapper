@@ -137,13 +137,13 @@ Nchannels = length(xcoords);
 
 kcoords = zeros(1,Nchannels);
 switch(electrode_type)
-    case {'staggered','poly3','poly5','twohundred'}
-        for a= 1:ngroups
-            kcoords(groups{a}+1) = a;
-        end
     case 'neurogrid'
         for a= 1:ngroups
             kcoords(groups{a}+1) = floor((a-1)/4)+1;
+        end
+    otherwise
+        for a= 1:ngroups
+            kcoords(groups{a}+1) = a;
         end
 end
 connected = true(Nchannels, 1);
