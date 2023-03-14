@@ -1,0 +1,3 @@
+[submodule "petersen-lab-matlab"]
+	path = petersen-lab-matlab
+	url = https://github.com/petersen-lab/petersen-lab-matlab.git
