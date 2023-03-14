@@ -1,165 +1,249 @@
 function savepath = KiloSortWrapper(varargin)
-% Creates channel map from Neuroscope xml files, runs KiloSort and
-% writes output data to Neurosuite format or Phy.
-% 
-% USAGE
+% savepath = KiloSortWrapper(basepath=value, basename=value, GPU_id=value, procPath=value, createSubdirectory=value, performAutoCluster=value, config=value, acqBoard=value, probe=value)
 %
-% KiloSortWrapper
-% Run from data folder. File basenames must be the
-% same as the name as current folder
+% This function is a Kilosort3 wrapper. Execute inside the data folder.
+%   Briefly, it runs Kilosort, creates a channel map from Neuroscope XML
+%   files, and writes output data in the Neurosuite format for Phy. All
+%   parameters are optional and have to be passed as name-value pairs.
 %
-% KiloSortWrapper(varargin)
-% Check varargin description below when input parameters are parsed
+% Dependencies: KiloSort3 (https://github.com/MouseLand/Kilosort).
+%               Git (Kilosort3 dependecy realy which is not listed by
+%                    Kilosort3; https://git-scm.com/download).
 %
-% Dependencies:  KiloSort (https://github.com/cortex-lab/KiloSort)
-%
-% The AutoClustering requires CCGHeart to be compiled.
-% Go to the private folder of the wrapper and type:
+% The AutoClustering requires CCGHeart to be compiled. Go to the private
+% folder of the wrapper and type:
 % mex -O CCGHeart.c
-% 
-% Copyright (C) 2016 Brendon Watson and the Buzsakilab
+%
+% Input: basepath - a character array with the path to the data folder. By
+%                   default uses the current working directory.
+%        basename - a character array with the data filename. Default is
+%                   the last data folder in the path which is typically
+%                   'continuous'.
+%        GPU_id - a scalar with GPU ID. Default is 1.
+%        procPath - a character array with a path to the folder for storing
+%                   intermediate processing results. This folder should
+%                   typically reside on an SSD on your computer. Make it an
+%                   empty character array to use the basepath (or raw data
+%                   directory) for storing intermediate processing data
+%                   (default).
+%        createSubdirectory - a logical for creating an output directory.
+%                             If set to true, will put ptocessed Kilosort
+%                             data into a subfolder within basepath
+%                             (default).
+%        performAutoCluster - a logical that if set to true, will perform
+%                             PhyAutoCluster once Kilosort is complete when
+%                             exporting to Phy (default). For more info,
+%                             type help PhyAutoClustering.
+%                             Currently not implemented due to
+%                             compatibility issues: Will default to false.
+%        config - a character array specifying the full name of the custom
+%                 Kilosort configuration file to use instead of the default
+%                 Kilosort settings used by this Kilosort wrapper. The file
+%                 should be located inside the ConfigurationFiles folder.
+%                 The settings file should follow the same structure used
+%                 by KilosortConfiguration.m (type edit
+%                 KilosortConfiguration to inspect the file). Default is
+%                 empty, meaning using the default settings.
+%        acqBoard - a character array with the name of the acquisition
+%                   board, eg., 'OpenEphys'. Currently supports only
+%                   'OpenEphys' (default).
+%        probe - a character array with the name of the probe used to
+%                acquire the ecephys data. For Neuropixels use
+%                'Neuropixels'. For all other probes use 'other' (default).
+% Output: savepath - a character array with a path to the output directory.
+%
+% Examples:
+%   (1) The easiest way to execute this function is to use no input
+%       variables and call it from within the data folder:
+%         KiloSortWrapper
+%       In this case the default values will be used.
+%   (2) Alternatively, you can specify every input variable, like:
+%         basepath = cd;
+%         basename = 'continuous';
+%         GPU_id = 1;
+%         procPath = 'C:\Users\Martynas\temp_spikesorting';
+%         createSubdirectory = true;
+%         performAutoCluster = true;
+%         config = '';
+%         acqBoard = 'OpenEphys';
+%         probe = 'Neuropixels';
+%         savepath = KiloSortWrapper(basepath=basepath, basename=basename, ...
+%           GPU_id=GPU_id, procPath=procPath, createSubdirectory=createSubdirectory, ...
+%           performAutoCluster=performAutoCluster, config=config, acqBoard=acqBoard, ...
+%           probe=probe);
+%
+% The current version of the function has been modified by Martynas
+% Dervinis (martynas.dervinis@gmail.com) at the Petersen Lab, University of
+% Copenhagen.
 %
 % This program is free software; you can redistribute it and/or modify
 % it under the terms of the GNU General Public License as published by
 % the Free Software Foundation; either version 2 of the License, or
 % (at your option) any later version.
 
-disp('Running Kilosort spike sorting with the Buzsaki lab wrapper')
 
-%% Parsing inputs
-p = inputParser;
-basepath = cd;
-[~,basename] = fileparts(basepath);
-
-addParameter(p,'basepath',basepath,@ischar)         % path to the folder containing the data
-addParameter(p,'basename',basename,@ischar)         % file basenames (of the dat and xml files)
-addParameter(p,'GPU_id',1,@isnumeric)               % Specify the GPU_id
-addParameter(p,'SSD_path','K:\Kilosort',@ischar)    % Path to SSD disk. Make it empty to disable SSD
-addParameter(p,'CreateSubdirectory',1,@isnumeric)   % Puts the Kilosort output into a subfolder
-addParameter(p,'performAutoCluster',1,@isnumeric)   % Performs PhyAutoCluster once Kilosort is complete when exporting to Phy.
-addParameter(p,'config','',@ischar)                 % Specify a configuration file to use from the ConfigurationFiles folder. e.g. 'Omid'
-
+%% Parse inputs
+savepath = ''; %#ok<NASGU> 
+p = inputParserFunc(varargin{:});
 parse(p,varargin{:})
 
 basepath = p.Results.basepath;
 basename = p.Results.basename;
 GPU_id = p.Results.GPU_id;
-SSD_path = p.Results.SSD_path;
-CreateSubdirectory = p.Results.CreateSubdirectory;
+procPath = p.Results.procPath;
+createSubdirectory = p.Results.createSubdirectory;
 performAutoCluster = p.Results.performAutoCluster;
 config = p.Results.config;
+acqBoard = p.Results.acqBoard;
+probe = p.Results.probe;
 
-cd(basepath)
 
-%% Checking if dat and xml files exist
-if ~exist(fullfile(basepath,[basename,'.xml']))
-    warning('KilosortWrapper  %s.xml file not in path %s',basename,basepath);
-    return
-elseif ~exist(fullfile(basepath,[basename,'.dat']))
-    warning('KilosortWrapper  %s.dat file not in path %s',basename,basepath)
-    return
+%% Check if acquisition parameters are valid
+if ~strcmpi(acqBoard,'OpenEphys')
+  error('Only OpenEphys recording setup is currently supported')
+end
+if strcmpi(probe,'Neuropixels')
+  basepath = [basepath filesep 'Neuropix-PXI-100.0'];
+else
+  probe = 'other'; % Only 'Neuropixels' or 'other'
 end
 
-%% Creates a channel map file
+
+%% Check if required files and folders exist
+if ~exist(fullfile(basepath,[basename,'.xml']), 'file')
+  error('%s.xml file not in path %s',basename,basepath);
+elseif ~exist(fullfile(basepath,[basename,'.dat']), 'file')
+  error('%s.dat file not in path %s',basename,basepath)
+elseif ~isempty(procPath) && ~exist(procPath, 'dir')
+  error('%s folder does not exist',procPath)
+elseif ~isempty(config) && ~exist(config, 'file')
+  error('%s file does not exist',config)
+end
+
+
+%% Check the processing folder for sufficient space
+if isempty(procPath)
+  processingFolder = fullfile(basepath,'temp_wh.dat');
+else
+  FileObj = java.io.File(procPath);
+  freeBytes = FileObj.getFreeSpace;
+  dat_file = dir(fullfile(basepath,[basename,'.dat']));
+  if dat_file.bytes*1.1<freeBytes
+    disp('Creating a temporary dat file on the processing folder')
+    processingFolder = fullfile(procPath, [basename,'_temp_wh.dat']);
+  else
+    warning('Not sufficient space in your processing folder. Creating local dat file instead')
+    processingFolder = fullfile(basepath,'temp_wh.dat');
+  end
+end
+
+
+%% Create a channel map file
 disp('Creating ChannelMapFile')
-createChannelMapFile_KSW(basepath,basename,'staggered');
+createChannelMapFile_KSW(basepath,basename,'staggered'); % a subfunction of KilosortWrapper
 
-%% Loading configurations
+
+%% Configure Kilosort
 XMLFilePath = fullfile(basepath, [basename '.xml']);
-
 if isempty(config)
-    disp('Running Kilosort with standard settings')
-    ops = KilosortConfiguration(XMLFilePath);
+  disp('Configuring Kilosort using standard settings')
+  ops = KilosortConfiguration(XMLFilePath); % a subfunction of KilosortWrapper
 else
-    disp('Running Kilosort with user specific settings')
-    config_string = str2func(['KiloSortConfiguration_' config_version]);
-    ops = config_string(XMLFilePath);
-    clear config_string;
+  disp('Configuring Kilosort using custom settings')
+  addpath('ConfigurationFiles')
+  configFuncHandle = str2func(config);
+  ops = configFuncHandle(XMLFilePath); % a handle of a custom subfunction of KilosortWrapper
+  clear configFuncHandle;
 end
+ops.fproc = processingFolder;
+ops.datatype = acqBoard;
+ops.probe = probe;
 
-%% % Checks SSD location for sufficient space
-if isdir(SSD_path)
-    FileObj = java.io.File(SSD_path);
-    free_bytes = FileObj.getFreeSpace;
-    dat_file = dir(fullfile(basepath,[basename,'.dat']));
-    if dat_file.bytes*1.1<FileObj.getFreeSpace
-        disp('Creating a temporary dat file on the SSD drive')
-        ops.fproc = fullfile(SSD_path, [basename,'_temp_wh.dat']);
-    else
-        warning('Not sufficient space on SSD drive. Creating local dat file instead')
-        ops.fproc = fullfile(basepath,'temp_wh.dat');
-    end
-else
-    ops.fproc = fullfile(basepath,'temp_wh.dat');
-end
 
-%%
+%% initialise GPU (will erase any existing GPU arrays)
 if ops.GPU
-    disp('Initializing GPU')
-    gpudev = gpuDevice(GPU_id); % initialize GPU (will erase any existing GPU arrays)
+  disp('Initializing GPU')
+  gpudev = gpuDevice(GPU_id);
 end
+
+
+%% Convert raw data to binary format (only for data saved in OpenEphys data format)
 if strcmp(ops.datatype , 'openEphys')
-   ops = convertOpenEphysToRawBInary(ops);  % convert data, only for OpenEphys
+  ops = convertOpenEphysToRawBInary(ops); % a subfunction of Kilosort
 end
 
-%% Lauches KiloSort
+
+%% Run Kilosort
 disp('Running Kilosort pipeline')
-disp('PreprocessingData')
-[rez, DATA, uproj] = preprocessData(ops); % preprocess data and extract spikes for initialization
+rez            = preprocessDataSub(ops); % All functions used in this cell are Kilosort subfunctions
+rez            = datashift2(rez, 1);
+[rez, st3, tF] = extract_spikes(rez);
+rez            = template_learning(rez, tF, st3);
+[rez, st3, tF] = trackAndSort(rez);
+rez            = final_clustering(rez, tF, st3);
+rez            = find_merges(rez, 1);
 
-disp('Fitting templates')
-rez = fitTemplates(rez, DATA, uproj);  % fit templates iteratively
 
-disp('Extracting final spike times')
-rez = fullMPMU(rez, DATA); % extract final spike times (overlapping extraction)
-
-%% posthoc merge templates (under construction)
-% save matlab results file
-
-if CreateSubdirectory
-    timestamp = ['Kilosort_' datestr(clock,'yyyy-mm-dd_HHMMSS')];
-    savepath = fullfile(basepath, timestamp);
-    mkdir(savepath);
-    copyfile([basename '.xml'],savepath);
+%% Save Kilosort output
+if createSubdirectory
+  timestamp = ['Kilosort_' datestr(clock,'yyyy-mm-dd_HHMMSS')]; %#ok<DATST,CLOCK> 
+  savepath = fullfile(basepath, timestamp);
+  mkdir(savepath);
+  copyfile(fullfile(basepath,[basename '.xml']),savepath);
 else
-    savepath = fullfile(basepath);
+  savepath = fullfile(basepath);
 end
 rez.ops.basepath = basepath;
 rez.ops.basename = basename;
 rez.ops.savepath = savepath;
-disp('Saving rez file')
-% rez = merge_posthoc2(rez);
-save(fullfile(savepath,  'rez.mat'), 'rez', '-v7.3');
+disp('Saving Kilosort''s rez file')
+save(fullfile(savepath, 'rez.mat'), 'rez', '-v7.3');
 
-%% export python results file for Phy
+
+%% Export Kilosort spikesorting results for use in Phy
 if ops.export.phy
-    disp('Converting to Phy format')
-    rezToPhy_KSW(rez);
-    
-    % AutoClustering the Phy output
-    if performAutoCluster
-        PhyAutoClustering(savepath);
-    end
+  disp('Converting to Phy format')
+  rezToPhy2(rez, savepath); % a subfunction of Kilosort
+
+  % AutoClustering the Phy output
+%   if performAutoCluster
+%     PhyAutoClustering(savepath);
+%   end
 end
 
-%% export Neurosuite files
+
+%% Export Neurosuite files
 if ops.export.neurosuite
     disp('Converting to Klusters format')
-%     load('rez.mat')
-%     rez.ops.root = pwd;
-%     clustering_path = pwd;
-%     basename = rez.ops.basename;
-%     rez.ops.fbinary = fullfile(pwd, [basename,'.dat']);
     Kilosort2Neurosuite(rez)
-% 
-%     writeNPY(rez.ops.kcoords, fullfile(clustering_path, 'channel_shanks.npy'));
-% 
-%     phy_export_units(clustering_path,basename);
 end
 
-%% Remove temporary file and resetting GPU
+
+%% Remove the temporary file and reset the GPU
 delete(ops.fproc);
 reset(gpudev)
 gpuDevice([])
-disp('Kilosort Processing complete')
+disp('Kilosort processing complete')
 
+
+
+
+%% Local functions
+function p = inputParserFunc(varargin)
+% Parse input variables
+
+p = inputParser;
+basepath = cd;
+[~,basename] = fileparts(basepath);
+
+addParameter(p,'basepath',basepath,@ischar)          % path to the folder containing the data
+addParameter(p,'basename',basename,@ischar)          % file basenames (of the dat and xml files)
+addParameter(p,'GPU_id',1,@isnumeric)                % Specify the GPU_id
+addParameter(p,'procPath','',@ischar)                % Path to the intermediate processing folder (located on SSD). Make it empty to disable SSD
+addParameter(p,'createSubdirectory',true,@islogical) % Puts the Kilosort output into a subfolder
+addParameter(p,'performAutoCluster',true,@islogical) % Performs PhyAutoCluster once Kilosort is complete when exporting to Phy.
+addParameter(p,'config','',@ischar)                  % Specify a configuration file to use from the ConfigurationFiles folder.
+addParameter(p,'acqBoard','OpenEphys',@ischar)       % Specify acquisition board, e.g., 'OpenEphys'
+addParameter(p,'probe','other',@ischar)              % Specify the probe used: 'Neuropixels' or 'other'
+
+parse(p,varargin{:})
