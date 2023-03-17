@@ -34,8 +34,6 @@ function savepath = KiloSortWrapper(varargin)
 %                             PhyAutoCluster once Kilosort is complete when
 %                             exporting to Phy (default). For more info,
 %                             type help PhyAutoClustering.
-%                             Currently not implemented due to
-%                             compatibility issues: Will default to false.
 %        config - a character array specifying the full name of the custom
 %                 Kilosort configuration file to use instead of the default
 %                 Kilosort settings used by this Kilosort wrapper. The file
@@ -110,7 +108,7 @@ end
 
 
 %% Check if required files and folders exist
-if ~exist(fullfile(basepath,[basename,'.xml']), 'file')
+if ~exist(fullfile(basepath,[basename,'.xml']), 'file') && ~exist(fullfile(basepath,[basename,'.mat']), 'file')
   error('%s.xml file not in path %s',basename,basepath);
 elseif ~exist(fullfile(basepath,[basename,'.dat']), 'file')
   error('%s.dat file not in path %s',basename,basepath)
@@ -144,15 +142,19 @@ createChannelMapFile_KSW(basepath,basename,'staggered'); % a subfunction of Kilo
 
 
 %% Configure Kilosort
-XMLFilePath = fullfile(basepath, [basename '.xml']);
+if exist(fullfile(basepath,[basename,'.mat']), 'file')
+  metadataFilePath = fullfile(basepath, [basename '.mat']);
+else
+  metadataFilePath = fullfile(basepath, [basename '.xml']);
+end
 if isempty(config)
   disp('Configuring Kilosort using standard settings')
-  ops = KilosortConfiguration(XMLFilePath); % a subfunction of KilosortWrapper
+  ops = KilosortConfiguration(metadataFilePath); % a subfunction of KilosortWrapper
 else
   disp('Configuring Kilosort using custom settings')
   addpath('ConfigurationFiles')
   configFuncHandle = str2func(config);
-  ops = configFuncHandle(XMLFilePath); % a handle of a custom subfunction of KilosortWrapper
+  ops = configFuncHandle(metadataFilePath); % a handle of a custom subfunction of KilosortWrapper
   clear configFuncHandle;
 end
 ops.fproc = processingFolder;
@@ -180,7 +182,7 @@ rez            = datashift2(rez, 1);
 [rez, st3, tF] = extract_spikes(rez);
 rez            = template_learning(rez, tF, st3);
 [rez, st3, tF] = trackAndSort(rez);
-rez            = final_clustering(rez, tF, st3);
+rez            = final_clustering(rez, tF, st3); % rez.cProj is generated here
 rez            = find_merges(rez, 1);
 
 
@@ -203,7 +205,7 @@ save(fullfile(savepath, 'rez.mat'), 'rez', '-v7.3');
 %% Export Kilosort spikesorting results for use in Phy
 if ops.export.phy
   disp('Converting to Phy format')
-  rezToPhy2(rez, savepath); % a subfunction of Kilosort
+  rezToPhy2_KSW(rez, savepath); % a subfunction of KilosortWrapper
 
   % AutoClustering the Phy output
 %   if performAutoCluster
