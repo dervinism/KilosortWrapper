@@ -34,8 +34,6 @@ function savepath = KiloSortWrapper(varargin)
 %                             PhyAutoCluster once Kilosort is complete when
 %                             exporting to Phy (default). For more info,
 %                             type help PhyAutoClustering.
-%                             Currently not implemented due to
-%                             compatibility issues: Will default to false.
 %        config - a character array specifying the full name of the custom
 %                 Kilosort configuration file to use instead of the default
 %                 Kilosort settings used by this Kilosort wrapper. The file
@@ -49,7 +47,8 @@ function savepath = KiloSortWrapper(varargin)
 %                   'OpenEphys' (default).
 %        probe - a character array with the name of the probe used to
 %                acquire the ecephys data. For Neuropixels use
-%                'Neuropixels'. For all other probes use 'other' (default).
+%                'Neuropixels1_checkerboard' or 'Neuropixels2'. For all
+%                other probes use 'other' (default).
 % Output: savepath - a character array with a path to the output directory.
 %
 % Examples:
@@ -66,14 +65,14 @@ function savepath = KiloSortWrapper(varargin)
 %         performAutoCluster = true;
 %         config = '';
 %         acqBoard = 'OpenEphys';
-%         probe = 'Neuropixels';
+%         probe = 'Neuropixels1_checkerboard';
 %         savepath = KiloSortWrapper(basepath=basepath, basename=basename, ...
 %           GPU_id=GPU_id, procPath=procPath, createSubdirectory=createSubdirectory, ...
 %           performAutoCluster=performAutoCluster, config=config, acqBoard=acqBoard, ...
 %           probe=probe);
 %
 % The current version of the function has been modified by Martynas
-% Dervinis (martynas.dervinis@gmail.com) at the Petersen Lab, University of
+% Dervinis (martynas.dervinis@gmail.com) at Petersen Lab, University of
 % Copenhagen.
 %
 % This program is free software; you can redistribute it and/or modify
@@ -102,16 +101,16 @@ probe = p.Results.probe;
 if ~strcmpi(acqBoard,'OpenEphys')
   error('Only OpenEphys recording setup is currently supported')
 end
-if strcmpi(probe,'Neuropixels')
+if contains(probe,'Neuropixels') && ~contains(basepath,'Neuropix')
   basepath = [basepath filesep 'Neuropix-PXI-100.0'];
 else
-  probe = 'other'; % Only 'Neuropixels' or 'other'
+  probe = 'other'; % Only 'Neuropixels1_checkerboard' or 'other'
 end
 
 
 %% Check if required files and folders exist
-if ~exist(fullfile(basepath,[basename,'.xml']), 'file')
-  error('%s.xml file not in path %s',basename,basepath);
+if ~exist(fullfile(basepath,[basename,'.xml']), 'file') && ~exist(fullfile(basepath,[basename,'.mat']), 'file')
+  error('%s.session.mat and %s.xml files are not in path %s',basename,basename,basepath);
 elseif ~exist(fullfile(basepath,[basename,'.dat']), 'file')
   error('%s.dat file not in path %s',basename,basepath)
 elseif ~isempty(procPath) && ~exist(procPath, 'dir')
@@ -140,19 +139,24 @@ end
 
 %% Create a channel map file
 disp('Creating ChannelMapFile')
-createChannelMapFile_KSW(basepath,basename,'staggered'); % a subfunction of KilosortWrapper
-
+if exist(fullfile(basepath,[basename,'.session.mat']), 'file')
+  metadataFilePath = fullfile(basepath, [basename '.session.mat']);
+else
+  metadataFilePath = fullfile(basepath, [basename '.xml']);
+end
+%createChannelMapFile_KSW(basepath, fullfile(basepath, [basename '.xml']));
+%createChannelMapFile_KSW(basepath, fullfile(basepath, [basename '.session.mat']));
+createChannelMapFile_KSW(basepath, metadataFilePath, probe); % a subfunction of KilosortWrapper
 
 %% Configure Kilosort
-XMLFilePath = fullfile(basepath, [basename '.xml']);
 if isempty(config)
   disp('Configuring Kilosort using standard settings')
-  ops = KilosortConfiguration(XMLFilePath); % a subfunction of KilosortWrapper
+  ops = KilosortConfiguration(metadataFilePath); % a subfunction of KilosortWrapper
 else
   disp('Configuring Kilosort using custom settings')
   addpath('ConfigurationFiles')
   configFuncHandle = str2func(config);
-  ops = configFuncHandle(XMLFilePath); % a handle of a custom subfunction of KilosortWrapper
+  ops = configFuncHandle(metadataFilePath); % a handle of a custom subfunction of KilosortWrapper
   clear configFuncHandle;
 end
 ops.fproc = processingFolder;
@@ -180,7 +184,7 @@ rez            = datashift2(rez, 1);
 [rez, st3, tF] = extract_spikes(rez);
 rez            = template_learning(rez, tF, st3);
 [rez, st3, tF] = trackAndSort(rez);
-rez            = final_clustering(rez, tF, st3);
+rez            = final_clustering(rez, tF, st3); % rez.cProj is generated here
 rez            = find_merges(rez, 1);
 
 
@@ -203,7 +207,7 @@ save(fullfile(savepath, 'rez.mat'), 'rez', '-v7.3');
 %% Export Kilosort spikesorting results for use in Phy
 if ops.export.phy
   disp('Converting to Phy format')
-  rezToPhy2(rez, savepath); % a subfunction of Kilosort
+  rezToPhy2_KSW(rez, savepath); % a subfunction of KilosortWrapper
 
   % AutoClustering the Phy output
 %   if performAutoCluster
@@ -244,6 +248,6 @@ addParameter(p,'createSubdirectory',true,@islogical) % Puts the Kilosort output 
 addParameter(p,'performAutoCluster',true,@islogical) % Performs PhyAutoCluster once Kilosort is complete when exporting to Phy.
 addParameter(p,'config','',@ischar)                  % Specify a configuration file to use from the ConfigurationFiles folder.
 addParameter(p,'acqBoard','OpenEphys',@ischar)       % Specify acquisition board, e.g., 'OpenEphys'
-addParameter(p,'probe','other',@ischar)              % Specify the probe used: 'Neuropixels' or 'other'
+addParameter(p,'probe','other',@ischar)              % Specify the probe used: 'Neuropixels1_checkerboard' or 'other'
 
 parse(p,varargin{:})

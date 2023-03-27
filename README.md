@@ -2,7 +2,7 @@
 Allows you to load Kilosort from a .xml and a .dat file compatible with Neurosuite. 
 
 ## Installation
-Download and add the KilosortWrapper directory to your Matlab path.
+Download and add the KilosortWrapper directory to your Matlab path. Also add subdirectories ```chanMaps``` and ```ConfigurationFiles``` to your Matlab path.
 
 ## Settings
 Most settings are defined in the KilosortConfiguration.m file. Some general settings are defined in the KilosortWrapper file, including: 
