@@ -1,4 +1,4 @@
-function chanMapFile = createChannelMapFile_KSW(savepath, metadataFile, probe)
+function [chanMapFile, probe] = createChannelMapFile_KSW(savepath, metadataFile, probe)
 % savepath = createChannelMapFile_KSW(savepath, metadataFile, probe)
 %
 % Creates Kilosort chanMap file.
@@ -38,6 +38,8 @@ function chanMapFile = createChannelMapFile_KSW(savepath, metadataFile, probe)
 % Returns:
 %   chanMapFile (char): a shape-(1, M) full path string with the full path
 %     name of the newly generated channel map file.
+%   probe (char): a shape-(1, M) string with the name of the probe for
+%     which the channel map file has been produced.
 %
 % Comments:
 %   Witten by Martynas Dervinis (martynas.dervinis@gmail.com) at Petersen
@@ -86,6 +88,10 @@ if loadMetadata % Legacy mode
     load(metadataFile); %#ok<*LOAD> 
     if ~exist('session', 'var') % Reserved variable
       error('Supplied MAT metadata file is missing session info!')
+    elseif ~isfield(session, 'extracellular')
+      error('Supplied MAT metadata file is missing session.extracellular field!')
+    elseif ~isfield(session.extracellular, 'equipment')
+      error('Supplied MAT metadata file is missing session.extracellular.equipment field!')
     end
     probe = session.extracellular.equipment;
     electrodeGroups = session.extracellular.electrodeGroups.channels; % Anatomical electrode groups. Could be grouped based on shank, brain area, or both.
