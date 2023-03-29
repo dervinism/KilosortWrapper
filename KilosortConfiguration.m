@@ -27,7 +27,7 @@ end
 try
   if strcmpi(metadataFile(end-2:end),'mat') % CellExplorer
     metadata = load(metadataFile);
-    sampleRate = metadata.extracellular.sr;
+    sampleRate = metadata.session.extracellular.sr;
   else % Neuroscope
     metadata = LoadXml(metadataFile); % a subfunction of KilosortWrapper
     sampleRate = metadata.SampleRate;

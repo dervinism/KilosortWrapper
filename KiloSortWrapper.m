@@ -113,15 +113,15 @@ probe = p.Results.probe;
 if ~strcmpi(acqBoard,'OpenEphys')
   error('Only OpenEphys recording setup is currently supported')
 end
-if contains(probe,'Neuropixels') && ~contains(basepath,'Neuropix')
-  basepath = [basepath filesep 'Neuropix-PXI-100.0'];
+if ~contains(probe,'Neuropixels', 'IgnoreCase',true)
+  probe = 'other'; % Only 'Neuropixels1_checkerboard' or 'other' currently
 else
-  probe = 'other'; % Only 'Neuropixels1_checkerboard' or 'other'
+  probe = 'Neuropixels1_checkerboard';
 end
 
 
 %% Check if required files and folders exist
-if ~exist(fullfile(basepath,[basename,'.xml']), 'file') && ~exist(fullfile(basepath,[basename,'.mat']), 'file')
+if ~exist(fullfile(basepath,[basename,'.xml']), 'file') && ~exist(fullfile(basepath,[basename,'.session.mat']), 'file')
   error('%s.session.mat and %s.xml files are not in path %s',basename,basename,basepath);
 elseif ~exist(fullfile(basepath,[basename,'.dat']), 'file')
   error('%s.dat file not in path %s',basename,basepath)
@@ -152,7 +152,6 @@ end
 
 
 %% Create a channel map file
-disp('Creating ChannelMapFile')
 if exist(fullfile(basepath,[basename,'.session.mat']), 'file')
   metadataFilePath = fullfile(basepath, [basename '.session.mat']);
 else
@@ -167,10 +166,10 @@ end
 
 %% Configure Kilosort
 if isempty(config)
-  disp('Configuring Kilosort using standard settings')
+  disp('Configuring Kilosort using standard settings:')
   ops = KilosortConfiguration(metadataFilePath); % a subfunction of KilosortWrapper
 else
-  disp('Configuring Kilosort using custom settings')
+  disp('Configuring Kilosort using custom settings:')
   addpath('ConfigurationFiles')
   configFuncHandle = str2func(config);
   ops = configFuncHandle(metadataFilePath); % a handle of a custom subfunction of KilosortWrapper
@@ -179,23 +178,27 @@ end
 ops.fproc = processingFolder;
 ops.datatype = acqBoard;
 ops.probe = probe;
+disp('  Done.')
 
 
 %% Initialise GPU (will erase any existing GPU arrays)
 if ops.GPU
-  disp('Initializing GPU')
+  disp('Initializing GPU:  ')
   gpudev = gpuDevice(GPU_id);
+  disp('  Done.')
 end
 
 
 %% Convert raw data to binary format (only for data saved in OpenEphys data format)
 if strcmp(ops.datatype , 'openEphys')
+  disp('Converting OpenEphys format to raw binary:')
   ops = convertOpenEphysToRawBInary(ops); % a subfunction of Kilosort
+  disp('  Done.')
 end
 
 
 %% Run Kilosort
-disp('Running Kilosort pipeline')
+disp('Running Kilosort pipeline:')
 rez            = preprocessDataSub(ops); % All functions used in this cell are Kilosort subfunctions
 rez            = datashift2(rez, 1);
 [rez, st3, tF] = extract_spikes(rez);
@@ -203,9 +206,11 @@ rez            = template_learning(rez, tF, st3);
 [rez, st3, tF] = trackAndSort(rez);
 rez            = final_clustering(rez, tF, st3); % rez.cProj is generated here
 rez            = find_merges(rez, 1);
+disp('  Done running Kilosort pipeline.')
 
 
 %% Save Kilosort output
+disp('Saving Kilosort''s rez file:')
 if createSubdirectory
   timestamp = ['Kilosort_' datestr(clock,'yyyy-mm-dd_HHMMSS')]; %#ok<DATST,CLOCK> 
   savepath = fullfile(basepath, timestamp);
@@ -217,13 +222,13 @@ end
 rez.ops.basepath = basepath;
 rez.ops.basename = basename;
 rez.ops.savepath = savepath;
-disp('Saving Kilosort''s rez file')
 save(fullfile(savepath, 'rez.mat'), 'rez', '-v7.3');
+disp('  Done.')
 
 
 %% Export Kilosort spikesorting results for use in Phy
 if ops.export.phy
-  disp('Converting to Phy format')
+  disp('Converting to Phy format:')
   rezToPhy2_KSW(rez, savepath); % a subfunction of KilosortWrapper
 
   % Extract cluster features
@@ -236,6 +241,7 @@ if ops.export.phy
   elseif isunix
     warning('Feature extraction is currently not supported on Linux.')
   end
+  disp('  Done converting to Phy format.')
 
   % AutoClustering the Phy output
 %   if performAutoCluster
@@ -246,8 +252,9 @@ end
 
 %% Export Neurosuite files
 if ops.export.neurosuite
-    disp('Converting to Klusters format')
+    disp('Converting to Klusters format:')
     Kilosort2Neurosuite(rez);
+    disp('  Done.')
 end
 
 
@@ -256,7 +263,7 @@ delete(ops.fproc);
 cd(rootFolder);
 reset(gpudev);
 gpuDevice([]);
-disp('Kilosort processing complete')
+disp('Kilosort processing complete.')
 
 
 

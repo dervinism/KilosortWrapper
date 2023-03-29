@@ -51,6 +51,7 @@ arguments
   probe (1,:) char {ismember(probe, {'Neuropixels1_checkerboard',''})} = ''
 end
 supportedProbesFromMetadata = {'staggered','neurogrid','grid','poly3','poly5','twohundred'};
+verbose = true;
 
 
 %% Parse input
@@ -82,8 +83,13 @@ end
 
 
 %% Parse metadata
+if verbose
+  disp('Creating Probe channel map file:')
+end
 if loadMetadata % Legacy mode
-  disp('Loading probe metadata');
+  if verbose
+    disp('  Loading probe channel map info from metadata...');
+  end
   if strcmpi(metadataFile(end-2:end), 'mat') % MAT format compatible with CellExplorer
     load(metadataFile); %#ok<*LOAD> 
     if ~exist('session', 'var') % Reserved variable
@@ -116,12 +122,16 @@ if loadMetadata % Legacy mode
     error(errMsg)
   end
 else % Currently preferred mode
-  disp('Infering probe metadata');
+  if verbose
+    disp('  Using local probe channel map info...');
+  end
 end
 
 
 %% Construct the probe channel map
-disp('Constructing the probe channel map')
+if verbose
+  disp('  Constructing the probe channel map...')
+end
 if loadMetadata
   [chanMap, chanMap0ind, connected, xcoords, ycoords, kcoords] = mapFromMetadata(probe, electrodeGroups, params); % Legacy method
 else
@@ -130,9 +140,14 @@ end
 
 
 %% Save the channel map file for Kilosort
-disp('Saving the probe channel map file')
+if verbose
+  disp('  Saving the probe channel map file...')
+end
 chanMapFile = fullfile(savepath,'chanMap.mat');
 save(chanMapFile, 'chanMap','chanMap0ind','connected','xcoords','ycoords','kcoords', '-v7.3');
+if verbose
+  disp(['  Saved the probe channel map file as ' chanMapFile '.'])
+end
 
 
 
