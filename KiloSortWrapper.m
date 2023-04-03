@@ -135,14 +135,21 @@ end
 
 
 %% Check the processing folder for sufficient space
+timestamp = ['Kilosort_' datestr(clock,'yyyy-mm-dd_HHMMSS')]; %#ok<DATST,CLOCK>
 if isempty(procPath)
-  processingFolder = fullfile(basepath,'temp_wh.dat');
+  if createSubdirectory
+    savepath = fullfile(basepath, timestamp);
+    mkdir(savepath);
+    processingFolder = fullfile(savepath,'temp_wh.dat');
+  else
+    processingFolder = fullfile(basepath,'temp_wh.dat');
+  end
 else
   FileObj = java.io.File(procPath);
   freeBytes = FileObj.getFreeSpace;
   dat_file = dir(fullfile(basepath,[basename,'.dat']));
   if dat_file.bytes*1.1<freeBytes
-    disp('Creating a temporary dat file on the processing folder')
+    disp('Creating a temporary dat file in the processing folder')
     processingFolder = fullfile(procPath, [basename,'_temp_wh.dat']);
   else
     warning('Not sufficient space in your processing folder. Creating local dat file instead')
@@ -212,9 +219,10 @@ disp('  Done running Kilosort pipeline.')
 %% Save Kilosort output
 disp('Saving Kilosort''s rez file:')
 if createSubdirectory
-  timestamp = ['Kilosort_' datestr(clock,'yyyy-mm-dd_HHMMSS')]; %#ok<DATST,CLOCK> 
   savepath = fullfile(basepath, timestamp);
-  mkdir(savepath);
+  if ~exist(savepath,'dir')
+    mkdir(savepath);
+  end
   copyfile(fullfile(basepath,[basename '.xml']),savepath);
 else
   savepath = fullfile(basepath);
@@ -263,6 +271,8 @@ end
 
 %% Remove the temporary file and reset the GPU
 %delete(ops.fproc);
+warning(fprintf(['The temporary Kilosort processing file %s has not been deleted so you could open the TraceView window in Phy. \n' ...
+  'Delete this file after you complete spikesorting, because it takes a lot of storage space on your computer.'], ops.fproc))
 cd(rootFolder);
 reset(gpudev);
 gpuDevice([]);
