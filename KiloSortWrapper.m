@@ -223,6 +223,9 @@ rez.ops.basepath = basepath;
 rez.ops.basename = basename;
 rez.ops.savepath = savepath;
 save(fullfile(savepath, 'rez.mat'), 'rez', '-v7.3');
+fH = gcf; savefig(fH, 'ks_fig1', 'compact'); close(fH);
+fH = gcf; savefig(fH, 'ks_fig2', 'compact'); close(fH);
+fH = gcf; savefig(fH, 'ks_fig3', 'compact'); close(fH);
 disp('  Done.')
 
 
@@ -234,7 +237,7 @@ if ops.export.phy
   % Extract cluster features
   cd(savepath);
   if ispc
-    system_cmd = [phyPath filesep 'Scripts' filesep 'activate & phy extract-waveforms params.py'];
+    system_cmd = [phyPath filesep 'Scripts' filesep 'activate & phy extract-waveforms params.py --nc 32'];
     system(system_cmd);
   elseif ismac
     warning('Feature extraction is currently not supported on macOS.')
@@ -259,7 +262,7 @@ end
 
 
 %% Remove the temporary file and reset the GPU
-delete(ops.fproc);
+%delete(ops.fproc);
 cd(rootFolder);
 reset(gpudev);
 gpuDevice([]);
