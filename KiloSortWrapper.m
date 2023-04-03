@@ -231,9 +231,9 @@ rez.ops.basepath = basepath;
 rez.ops.basename = basename;
 rez.ops.savepath = savepath;
 save(fullfile(savepath, 'rez.mat'), 'rez', '-v7.3');
-fH = gcf; savefig(fH, 'ks_fig1', 'compact'); close(fH);
-fH = gcf; savefig(fH, 'ks_fig2', 'compact'); close(fH);
-fH = gcf; savefig(fH, 'ks_fig3', 'compact'); close(fH);
+fH = gcf; savefig(fH, fullfile(savepath,'ks_fig1.fig'), 'compact'); close(fH);
+fH = gcf; savefig(fH, fullfile(savepath,'ks_fig2.fig'), 'compact'); close(fH);
+fH = gcf; savefig(fH, fullfile(savepath,'ks_fig3.fig'), 'compact'); close(fH);
 disp('  Done.')
 
 
