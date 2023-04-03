@@ -271,8 +271,8 @@ end
 
 %% Remove the temporary file and reset the GPU
 %delete(ops.fproc);
-warning(fprintf(['The temporary Kilosort processing file %s has not been deleted so you could open the TraceView window in Phy. \n' ...
-  'Delete this file after you complete spikesorting, because it takes a lot of storage space on your computer.'], ops.fproc))
+warning(['The temporary Kilosort processing file ' ops.fproc ' has not been deleted so you could open the TraceView window in Phy. ' ...
+  'Delete this file after you complete spikesorting, because it takes a lot of storage space on your computer.'])
 cd(rootFolder);
 reset(gpudev);
 gpuDevice([]);
