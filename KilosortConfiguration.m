@@ -66,7 +66,7 @@ ops.Th = [9 9];
 ops.lam = 10;  
 
 % splitting a cluster at the end requires at least this much isolation for each sub-cluster (max = 1)
-ops.AUCsplit = 0.9; 
+ops.AUCsplit = 1; % MD: Original value was set to 0.9 but due to overclustering increased it to 1
 
 % minimum spike rate (Hz), if a cluster falls below this for too long it
 % gets removed (MD: How is this different from minfr_goodchannels?)
@@ -91,7 +91,7 @@ ops.nskip          = 25;  % how many batches to skip for determining spike PCs
 
 ops.GPU            = 1;   % has to be 1, no CPU version yet, sorry
 % ops.Nfilt          = 1024;   % max number of clusters
-ops.nfilt_factor   = 4;   % max number of clusters per good channel (even temporary ones)
+ops.nfilt_factor   = 4;   % max number of clusters per good channel (even temporary ones).
 ops.ntbuff         = 64;  % samples of symmetrical buffer for whitening and spike detection
 ops.NT             = 64*1024+ops.ntbuff; % must be multiple of 32 + ntbuff. This is the batch size (try decreasing if out of memory). 
 ops.whiteningRange = 32;  % number of channels to use for whitening each channel
@@ -107,7 +107,7 @@ ops.trange   = [0 Inf]; % time range to sort
 ops.NchanTOT = numel(connected); % total number of channels in your recording
 
 ops.sig      = 20;  % spatial smoothness constant for registration
-ops.fshigh   = 300; % high-pass more aggresively
+ops.fshigh   = 300; % high-pass more aggresively (MD: overrides the initial value)
 ops.nblocks  = 5;   % blocks for registration. 0 turns it off, 1 does rigid registration. Replaces "datashift" option.
 
 % find the binary file

@@ -223,7 +223,9 @@ if createSubdirectory
   if ~exist(savepath,'dir')
     mkdir(savepath);
   end
-  copyfile(fullfile(basepath,[basename '.xml']),savepath);
+  if exist(metadataFilePath, 'file')
+    copyfile(metadataFilePath, savepath);
+  end
 else
   savepath = fullfile(basepath);
 end
@@ -245,7 +247,7 @@ if ops.export.phy
   % Extract cluster features
   cd(savepath);
   if ispc
-    system_cmd = [phyPath filesep 'Scripts' filesep 'activate & phy extract-waveforms params.py --nc 32'];
+    system_cmd = [phyPath filesep 'Scripts' filesep 'activate & phy extract-waveforms params.py 50000 --nc 32'];
     system(system_cmd);
   elseif ismac
     warning('Feature extraction is currently not supported on macOS.')

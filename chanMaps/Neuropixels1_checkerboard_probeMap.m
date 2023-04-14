@@ -78,7 +78,7 @@ classdef Neuropixels1_checkerboard_probeMap
       siteIDs(~connectedSites) = NaN;
       hDim = 4;
       vDim = round(nSites/2);
-      basicMotive = [1 0 1 0 0 1 0 1];
+      basicMotive = [0 1 0 1 1 0 1 0];
       eMapExt = repmat(basicMotive,1,vDim/2);
       eMap1(logical(eMapExt)) = siteIDs';
       eMap1(~logical(eMapExt)) = NaN;
