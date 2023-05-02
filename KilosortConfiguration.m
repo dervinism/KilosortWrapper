@@ -51,7 +51,7 @@ load(fullfile(rootpath,'chanMap.mat'),'connected');
 ops.chanMap = fullfile(rootpath,'chanMap.mat');
 
 % sample rate
-ops.fs = sampleRate;  
+ops.fs = sampleRate;
 
 % frequency for high pass filtering (150)
 ops.fshigh = 150;
