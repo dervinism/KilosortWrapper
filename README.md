@@ -36,3 +36,5 @@ Creates all classical files used in the Neurosuite format. For this the dat file
 
 ### Cite as
 Peter C. Petersen, Brendon Watson, & Adrien Peyrache. (2020, January 10). petersenpeter/KilosortWrapper: KiloSortWrapper (Version 1.0). Zenodo. http://doi.org/10.5281/zenodo.3604165
+
+Note that the DOI above links to the old version. This repository contains the new version that runs Kilosort 2.5 and 3. It has been adapted to run Kilosort 2.5 and 3 by Martynas Dervinis (martynas.dervinis@gmail.com)
