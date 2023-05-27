@@ -177,11 +177,11 @@ if exist(fullfile(basepath,[basename,'.session.mat']), 'file')
 else
   metadataFilePath = fullfile(basepath, [basename '.xml']);
 end
-% if ~isempty(probe)
-%   [~, probe] = createChannelMapFile_KSW(basepath, '', probe); % a subfunction of KilosortWrapper
-% else
-%   [~, probe] = createChannelMapFile_KSW(basepath, metadataFilePath);
-% end
+if ~isempty(probe)
+  [~, probe] = createChannelMapFile_KSW(basepath, '', probe); % a subfunction of KilosortWrapper
+else
+  [~, probe] = createChannelMapFile_KSW(basepath, metadataFilePath);
+end
 
 
 %% Configure Kilosort
