@@ -1,5 +1,5 @@
 function savepath = KiloSortWrapper(varargin)
-% savepath = KiloSortWrapper(basepath=value, basename=value, GPU_id=value, procPath=value, createSubdirectory=value, performAutoCluster=value, config=value, acqBoard=value, probe=value)
+% savepath = KiloSortWrapper(algorithm=value, basepath=value, basename=value, GPU_id=value, procPath=value, createSubdirectory=value, performAutoCluster=value, config=value, acqBoard=value, probe=value)
 %
 % This function is a Kilosort3 wrapper. Execute inside the data folder.
 %
@@ -16,7 +16,14 @@ function savepath = KiloSortWrapper(varargin)
 % folder of the wrapper and type:
 % mex -O CCGHeart.c
 %
-% Input: basepath - a character array with the path to the data folder. By
+% Input: algorithm - a character array stating which spikesorting
+%                    algorithm to use:
+%                      'ks2.5' - Kilosort 2.5 (default);
+%                      'ks3' - Kilosort 3.
+%        driftCorrection - a logical seting up drif correction. If set to
+%                          true, Kilosort will perform drift correction.
+%                          Default is false.
+%        basepath - a character array with the path to the data folder. By
 %                   default uses the current working directory.
 %        basename - a character array with the data filename. Default is
 %                   the last data folder in the path which is typically
@@ -66,6 +73,8 @@ function savepath = KiloSortWrapper(varargin)
 %         KiloSortWrapper
 %       In this case the default values will be used.
 %   (2) Alternatively, you can specify every input variable, like:
+%         algorithm='ks3';
+%         driftCorrection = true;
 %         basepath = cd;
 %         basename = 'continuous';
 %         GPU_id = 1;
@@ -76,10 +85,12 @@ function savepath = KiloSortWrapper(varargin)
 %         phyPath = 'C:\Users\Martynas\Python_environments\phy';
 %         acqBoard = 'OpenEphys';
 %         probe = 'Neuropixels1_checkerboard';
-%         savepath = KiloSortWrapper(basepath=basepath, basename=basename, ...
-%           GPU_id=GPU_id, procPath=procPath, createSubdirectory=createSubdirectory, ...
-%           performAutoCluster=performAutoCluster, config=config, phyPath=phyPath, ...
-%           acqBoard=acqBoard, probe=probe);
+%         savepath = KiloSortWrapper( ...
+%           algorithm=algorithm, driftCorrection=driftCorrection, ...
+%           basepath=basepath, basename=basename, GPU_id=GPU_id, ...
+%           procPath=procPath, createSubdirectory=createSubdirectory, ...
+%           performAutoCluster=performAutoCluster, config=config, ...
+%           phyPath=phyPath, acqBoard=acqBoard, probe=probe);
 %
 % The current version of the function has been modified by Martynas
 % Dervinis (martynas.dervinis@gmail.com) at Petersen Lab, University of
@@ -97,6 +108,8 @@ rootFolder = cd;
 p = inputParserFunc(varargin{:});
 parse(p,varargin{:})
 
+algorithm = p.Results.algorithm;
+driftCorrection = p.Results.driftCorrection;
 basepath = p.Results.basepath;
 basename = p.Results.basename;
 GPU_id = p.Results.GPU_id;
@@ -164,11 +177,11 @@ if exist(fullfile(basepath,[basename,'.session.mat']), 'file')
 else
   metadataFilePath = fullfile(basepath, [basename '.xml']);
 end
-if ~isempty(probe)
-  [~, probe] = createChannelMapFile_KSW(basepath, '', probe); % a subfunction of KilosortWrapper
-else
-  [~, probe] = createChannelMapFile_KSW(basepath, metadataFilePath);
-end
+% if ~isempty(probe)
+%   [~, probe] = createChannelMapFile_KSW(basepath, '', probe); % a subfunction of KilosortWrapper
+% else
+%   [~, probe] = createChannelMapFile_KSW(basepath, metadataFilePath);
+% end
 
 
 %% Configure Kilosort
@@ -182,6 +195,8 @@ else
   ops = configFuncHandle(metadataFilePath); % a handle of a custom subfunction of KilosortWrapper
   clear configFuncHandle;
 end
+ops.algorithm = algorithm;
+ops.driftCorrection = driftCorrection;
 ops.fproc = processingFolder;
 ops.datatype = acqBoard;
 ops.probe = probe;
@@ -204,15 +219,50 @@ if strcmp(ops.datatype , 'openEphys')
 end
 
 
+%% Resolve Kilosort path
+if strcmpi(algorithm,'ks2.5')
+  ksPath = which('main_kilosort','-all');
+elseif strcmpi(algorithm,'ks3')
+  ksPath = which('main_kilosort3','-all');
+end
+if numel(ksPath) > 1
+  error('Multiple conflicting versions of Kilosort detected on the path. Consider modifying your Matlab path.');
+end
+addpath(genpath(fileparts(ksPath{1})));
+
+
 %% Run Kilosort
+% All functions used in this cell are Kilosort subfunctions
 disp('Running Kilosort pipeline:')
-rez            = preprocessDataSub(ops); % All functions used in this cell are Kilosort subfunctions
-rez            = datashift2(rez, 1);
-[rez, st3, tF] = extract_spikes(rez);
-rez            = template_learning(rez, tF, st3);
-[rez, st3, tF] = trackAndSort(rez);
-rez            = final_clustering(rez, tF, st3); % rez.cProj is generated here
-rez            = find_merges(rez, 1);
+if strcmpi(algorithm,'ks2.5')
+  rez            = preprocessDataSub(ops);
+  rez            = datashift2(rez, driftCorrection);
+  rez            = learnAndSolve8b(rez, 1);
+  rez            = find_merges(rez, 1);
+  rez            = splitAllClusters(rez, 1);
+  rez            = set_cutoff(rez);
+  rez.good       = get_good_units(rez);
+  rez.cProj      = [];
+  rez.cProjPC    = [];
+  [~, isort]     = sortrows(rez.st3);
+  rez.st3        = rez.st3(isort, :);
+  % Ensure all GPU arrays are transferred to CPU side before saving to .mat
+  rez_fields = fieldnames(rez);
+  for i = 1:numel(rez_fields)
+    field_name = rez_fields{i};
+    if(isa(rez.(field_name), 'gpuArray'))
+      rez.(field_name) = gather(rez.(field_name));
+    end
+  end
+elseif strcmpi(algorithm,'ks3')
+  rez            = preprocessDataSub(ops);
+  rez            = datashift2(rez, driftCorrection);
+  [rez, st3, tF] = extract_spikes(rez);
+  rez            = template_learning(rez, tF, st3);
+  [rez, st3, tF] = trackAndSort(rez);
+  rez            = final_clustering(rez, tF, st3); % rez.cProj is generated here
+  rez            = find_merges(rez, 1);
+end
 disp('  Done running Kilosort pipeline.')
 
 
@@ -257,9 +307,9 @@ if ops.export.phy
   disp('  Done converting to Phy format.')
 
   % AutoClustering the Phy output
-%   if performAutoCluster
-%     PhyAutoClustering(savepath);
-%   end
+  if performAutoCluster
+    % PhyAutoClustering(savepath); % Currently not supported
+  end
 end
 
 
@@ -291,6 +341,8 @@ p = inputParser;
 basepath = cd;
 [~,basename] = fileparts(basepath);
 
+addParameter(p,'algorithm','ks2.5',@ischar)                % which Kilosort to use for spkesorting: ks2.5 or ks3
+addParameter(p,'driftCorrection',false,@islogical)         % Should Kilosort correct for drifting.
 addParameter(p,'basepath',basepath,@ischar)                % path to the folder containing the data
 addParameter(p,'basename',basename,@ischar)                % file basenames (of the dat and xml files)
 addParameter(p,'GPU_id',1,@isnumeric)                      % Specify the GPU_id

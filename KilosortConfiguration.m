@@ -51,26 +51,22 @@ load(fullfile(rootpath,'chanMap.mat'),'connected');
 ops.chanMap = fullfile(rootpath,'chanMap.mat');
 
 % sample rate
-ops.fs = sampleRate;  
-
-% frequency for high pass filtering (150)
-ops.fshigh = 150;
+ops.fs = sampleRate;
 
 % minimum firing rate on a "good" channel (0 to skip)
-ops.minfr_goodchannels = 0.1; 
+ops.minfr_goodchannels = 360/3600; 
 
 % threshold on projections (like in Kilosort1, can be different for last pass like [10 4])
-ops.Th = [9 9];  
+ops.Th = [8 4];  
 
 % how important is the amplitude penalty (like in Kilosort1, 0 means not used, 10 is average, 50 is a lot) 
 ops.lam = 10;  
 
 % splitting a cluster at the end requires at least this much isolation for each sub-cluster (max = 1)
-ops.AUCsplit = 1; % MD: Original value was set to 0.9 but due to overclustering increased it to 1
+ops.AUCsplit = 0.9;
 
-% minimum spike rate (Hz), if a cluster falls below this for too long it
-% gets removed (MD: How is this different from minfr_goodchannels?)
-ops.minFR = 1/50; 
+% minimum spike rate (Hz), if a cluster falls below this for too long it gets removed
+ops.minFR = -1; %1/50;
 
 % number of samples to average over (annealed from first to second value) 
 ops.momentum = [20 400]; 
@@ -85,7 +81,7 @@ ops.ThPre = 8;
 %% Set up Kilosort3 parameters: Part 2
 % Danger, changing these settings can lead to fatal errors
 % options for determining PCs
-ops.spkTh          = -6;  % spike threshold in standard deviations (-6)
+ops.spkTh          = 4;   % spike threshold in standard deviations (a positive integer)
 ops.reorder        = 1;   % whether to reorder batches for drift correction. 
 ops.nskip          = 25;  % how many batches to skip for determining spike PCs
 
@@ -107,7 +103,7 @@ ops.trange   = [0 Inf]; % time range to sort
 ops.NchanTOT = numel(connected); % total number of channels in your recording
 
 ops.sig      = 20;  % spatial smoothness constant for registration
-ops.fshigh   = 300; % high-pass more aggresively (MD: overrides the initial value)
+ops.fshigh   = 300; % high-pass filtering frequency
 ops.nblocks  = 5;   % blocks for registration. 0 turns it off, 1 does rigid registration. Replaces "datashift" option.
 
 % find the binary file
