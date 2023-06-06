@@ -48,7 +48,7 @@ load(fullfile(rootpath,'chanMap.mat'),'connected');
 
 %% Set up Kilosort3 parameters: Part 1
 % probe recording channel map file
-ops.chanMap = fullfile(rootpath,'chanMap.mat');
+ops.chanMap = fullfile(rootpath,'chanMap.mat'); 
 
 % sample rate
 ops.fs = sampleRate;
@@ -66,7 +66,7 @@ ops.lam = 10;
 ops.AUCsplit = 0.9;
 
 % minimum spike rate (Hz), if a cluster falls below this for too long it gets removed
-ops.minFR = -1; %1/50;
+ops.minFR = 1/3600;
 
 % number of samples to average over (annealed from first to second value) 
 ops.momentum = [20 400]; 
